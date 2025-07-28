@@ -1,8 +1,9 @@
+Testing vl42 in ROS2 Ubuntu 24.04.2 (kilted) on Pi5 with dual MIPI CSI-2 cameras
 # dual_camera_launch
 
-ROS 2 launch package running two OV5647 cameras on Pi 5 RP1
+ROS2 launch package running two OV5647 cameras on Pi 5 RP1
 
-Testing vl42 in Ubuntu 24.04.2 (kilted) with dual MIPI CSI-2 cameras
+The resolution is set to 1920x1080 @15fps in `launch/dual_cameras.launch.py`
 
 ## Build
 
@@ -19,23 +20,42 @@ colcon build --packages-select dual_camera_launch
 ```bash
 source ~/ros2_ws/install/setup.bash
 ros2 launch dual_camera_launch dual_cameras.launch.py
+```
+
+GUI Preview 
+```bash
 ros2 run rqt_image_view rqt_image_view
 ```
 
-Topics published:
+## Topics
+
+| Topic                    | Type                     | Description                    |
+|--------------------------|--------------------------|--------------------------------|
+| `/camera0/image_raw`     | `sensor_msgs/Image`      | Raw image stream from camera 0 |
+| `/camera0/camera_info`   | `sensor_msgs/CameraInfo` | Intrinsics for camera 0        |
+| `/camera1/image_raw`     | `sensor_msgs/Image`      | Raw image stream from camera 1 |
+| `/camera1/camera_info`   | `sensor_msgs/CameraInfo` | Intrinsics for camera 1        |
+
+```bash
+ros2 topic list
 ```
-/camera0/image_raw
+```text
 /camera0/camera_info
-
-/camera1/image_raw
+/camera0/image_raw
+/camera0/image_raw/compressed
 /camera1/camera_info
+/camera1/image_raw
+/camera1/image_raw/compressed
+/parameter_events
+/rosout
 ```
-
 ## Troubleshooting
 
 Check v4l2 on rpi5: 
 ```bash
-$ v4l2-ctl --list-devices
+v4l2-ctl --list-devices
+```
+```text
 pispbe (platform:1000880000.pisp_be):
 	/dev/video20
 	/dev/video21
@@ -83,8 +103,11 @@ rp1-cfe (platform:1f00128000.csi):
 rpivid (platform:rpivid):
 	/dev/video19
 	/dev/media3
-
-$ v4l2-ctl --device=/dev/video0 --all
+```
+```bash
+v4l2-ctl --device=/dev/video0 --all
+```
+```text
 Driver Info:
 	Driver name      : rp1-cfe
 	Card type        : rp1-cfe
@@ -137,13 +160,15 @@ Format Video Capture:
 Format Metadata Capture:
 	Sample Format   : 'SENS' (Sensor Ancillary Metadata)
 	Buffer Size     : 16384
-	
-	
-$ v4l2-ctl --device=/dev/video1 --all
+```	
+```bash
+v4l2-ctl --device=/dev/video8 --all
+```
+```text
 Driver Info:
 	Driver name      : rp1-cfe
 	Card type        : rp1-cfe
-	Bus info         : platform:1f00128000.csi
+	Bus info         : platform:1f00110000.csi
 	Driver version   : 6.8.12
 	Capabilities     : 0xaca00001
 		Video Capture
@@ -153,7 +178,8 @@ Driver Info:
 		Streaming
 		Extended Pix Format
 		Device Capabilities
-	Device Caps      : 0x24a00000
+	Device Caps      : 0x24a00001
+		Video Capture
 		Metadata Capture
 		I/O MC
 		Streaming
@@ -162,21 +188,32 @@ Media Driver Info:
 	Driver name      : rp1-cfe
 	Model            : rp1-cfe
 	Serial           : 
-	Bus info         : platform:1f00128000.csi
+	Bus info         : platform:1f00110000.csi
 	Media version    : 6.8.12
 	Hardware revision: 0x00114666 (1132134)
 	Driver version   : 6.8.12
 Interface Info:
-	ID               : 0x03000018
+	ID               : 0x03000014
 	Type             : V4L Video
 Entity Info:
-	ID               : 0x00000016 (22)
-	Name             : rp1-cfe-embedded
+	ID               : 0x00000012 (18)
+	Name             : rp1-cfe-csi2_ch0
 	Function         : V4L2 I/O
-	Pad 0x01000017   : 0: Sink, Must Connect
-	  Link 0x02000038: from remote pad 0x1000007 of entity 'csi2' (Video Interface Bridge): Data
+	Pad 0x01000013   : 0: Sink, Must Connect
+	  Link 0x02000034: from remote pad 0x1000006 of entity 'csi2' (Video Interface Bridge): Data
 Priority: 2
-Video input : 0 (rp1-cfe-embedded: ok)
+Video input : 0 (rp1-cfe-csi2_ch0: ok)
+Format Video Capture:
+	Width/Height      : 640/480
+	Pixel Format      : 'pRAA' (10-bit Bayer RGRG/GBGB Packed)
+	Field             : None
+	Bytes per Line    : 800
+	Size Image        : 384000
+	Colorspace        : Raw
+	Transfer Function : None
+	YCbCr/HSV Encoding: ITU-R 601
+	Quantization      : Full Range
+	Flags             : 
 Format Metadata Capture:
 	Sample Format   : 'SENS' (Sensor Ancillary Metadata)
 	Buffer Size     : 16384
@@ -186,7 +223,9 @@ Format Metadata Capture:
 
 Check for these problematic packages: 
 ```bash
-$ dpkg -l | grep libcamera
+dpkg -l | grep libcamera
+```
+```text
 ii  gstreamer1.0-libcamera:arm64                      0.2.0-3fakesync1build6                   arm64        complex camera support library (GStreamer plugin)
 ii  libcamera-tools                                   0.2.0-3fakesync1build6                   arm64        complex camera support library (tools)
 ii  libcamera0.2:arm64                                0.2.0-3fakesync1build6                   arm64        complex camera support library
@@ -215,21 +254,32 @@ sudo ldconfig
 
 ### Potenetial Issues
 
-DMA & Permissions:
+Group:
 ```bash
 sudo usermod -aG video $USER
 newgrp video
+```
 
-sudo ln -s /dev/dma_heap/linux,cma /dev/dma_heap/cma
+DMA Heap Device:
+```bash
 ls /dev/dma_heap
-# you should see: cma  linux,cma  system
+```
 
+If you do not see: `cma  linux,cma  system`
+```bash
+sudo ln -s /dev/dma_heap/linux,cma /dev/dma_heap/cma
+```
+
+Fixing DMA Permissions
+```bash
 sudo chown root:video /dev/dma_heap/*
 sudo chmod 0660 /dev/dma_heap/*
 ```
 
 Setup udev for a permanent fix:
+```bash
 /etc/udev/rules.d/99-dma-heap.rules
+```
 ```bash
 KERNEL=="dma_heap", NAME="dma_heap/%k", GROUP="video", MODE="0660"
 ```
